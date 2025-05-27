@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+# .git/  -- Generally not needed if build context is n8n_template_manager
+# .gitignore -- Generally not needed if build context is n8n_template_manager
+../db_backups/ # Relative to .dockerignore location if context is n8n_template_manager
+../whoosh_index/
+../*.db
+../*.db-journal
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
