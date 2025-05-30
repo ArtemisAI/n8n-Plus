@@ -7,10 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from whoosh.qparser import QueryParser, MultifieldParser, DEFAULT_OPERATOR
 
-from app.models.api_models import WorkflowBase, WorkflowDetail, PaginatedWorkflows, N8NImportRequest, N8NImportResponse # Added N8N models
+from app.models.api_models import WorkflowBase, WorkflowDetail, PaginatedWorkflows, N8NImportRequest, N8NImportResponse, ImportToN8NRequest, ImportResponse # Added N8N models
 from app.models.workflow import Workflow as DBWorkflow # SQLAlchemy model, aliased to avoid confusion
-from app.api.utils import get_db
+from app.api.utils import get_db # Assuming this is where get_db is correctly defined
 from app.services.search_service import get_index
+from app.services import github_template_fetcher # Added for GitHub sync
+from fastapi import BackgroundTasks # Added for background tasks
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -274,3 +276,19 @@ async def import_template_to_n8n(payload: N8NImportRequest, db: Session = Depend
     except Exception as e:
         logger.error(f"Unexpected error during n8n import process for template ID {payload.template_id}: {e}", exc_info=True)
         return N8NImportResponse(success=False, message=f"An unexpected error occurred: {str(e)}")
+
+
+@router.post("/templates/sync_github", summary="Sync templates from GitHub repository")
+async def sync_github_templates_endpoint(background_tasks: BackgroundTasks, db: Session = Depends(get_db)): # Added db session dependency
+    if not github_template_fetcher.GITHUB_REPO_URL:
+        logger.warning("GitHub sync endpoint called but GITHUB_REPO_URL_PERSONAL_TEMPLATES is not set.")
+        raise HTTPException(status_code=400, detail="GitHub repository URL is not configured in the server.")
+
+    logger.info("Adding GitHub template fetch task to background.")
+    # Note: If fetch_templates_from_github itself needs a DB session,
+    # and it creates its own using SessionLocal(), that's fine for a background task.
+    # However, if you want to manage the session from the endpoint that initiates the task,
+    # you'd need to pass the session or session factory to the background function.
+    # The current github_template_fetcher creates its own session.
+    background_tasks.add_task(github_template_fetcher.fetch_templates_from_github)
+    return {"message": "GitHub template synchronization has been initiated in the background."}

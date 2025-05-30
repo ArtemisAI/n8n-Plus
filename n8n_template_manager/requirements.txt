@@ -1,7 +1,9 @@
 fastapi
 uvicorn[standard]
 sqlalchemy
-psycopg2-binary
+psycopg2-binary>=2.9.0,<3.0.0
 requests
 python-whoosh
 sqlite
+python-dotenv==0.21.0
+GitPython>=3.1.0,<4.0.0

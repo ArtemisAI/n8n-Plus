@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  n8n:
+    build:
+      context: .
+      dockerfile: Dockerfile # Assumes main n8n Dockerfile is at the root
+    container_name: n8n_main
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    environment:
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=${N8N_PORT:-5678}
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - NODE_ENV=${NODE_ENV:-development}
+      - N8N_LOG_LEVEL=${N8N_LOG_LEVEL:-info}
+      - TZ=${TZ:-America/New_York}
+      # Add any other n8n specific environment variables here
+      # Example for webhook tunneling (if needed, though typically for production deployments)
+      # - WEBHOOK_URL=https://your-public-n8n-domain.com/
+      # For local development, n8n usually handles this.
+    volumes:
+      - ./n8n_data:/home/node/.n8n # Persists n8n data
+    depends_on:
+      - postgres # Optional: if n8n itself is configured to use this Postgres
+    networks:
+      - n8n-network
+
+  postgres:
+    image: postgres:13-alpine
+    container_name: n8n_postgres_db
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-n8nuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-n8npassword}
+      POSTGRES_DB: ${POSTGRES_DB:-n8ndatabase}
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data # Persists PostgreSQL data
+    networks:
+      - n8n-network
+
+  n8n_template_manager:
+    build:
+      context: ./n8n_template_manager # Path to the template manager's Dockerfile
+      dockerfile: Dockerfile
+    container_name: n8n_template_manager_app
+    ports:
+      - "${TEMPLATE_MANAGER_APP_PORT:-8001}:8000" # Maps internal port 8000 to host port 8001
+    environment:
+      - DATABASE_URL_POSTGRES=${TEMPLATE_MANAGER_DB_URL}
+      - APP_HOST=${TEMPLATE_MANAGER_APP_HOST:-0.0.0.0}
+      # The template manager's internal port is 8000 (from its main.py)
+      - APP_PORT=8000
+      - LOG_LEVEL=${TEMPLATE_MANAGER_LOG_LEVEL:-INFO}
+      - GITHUB_REPO_URL_PERSONAL_TEMPLATES=${GITHUB_REPO_URL_PERSONAL_TEMPLATES}
+      # Ensure APP_ROOT_DIR is set if github_template_fetcher.py relies on it for .env path in Docker
+      - APP_ROOT_DIR=/app
+    volumes:
+      # Mount the .env file for the template manager directly if it's specific
+      # Or rely on the environment variables passed above
+      # For simplicity, we pass DATABASE_URL_POSTGRES directly.
+      # If n8n_template_manager/app/db/database.py loads .env from BASE_DIR,
+      # it might try to find n8n_template_manager/.env.
+      # The environment variables passed here should take precedence.
+
+      # Volume for persistent Whoosh index and potentially SQLite if not using Postgres
+      - ./n8n_template_manager_data/whoosh_index:/app/whoosh_index
+      # If SQLite was used as a fallback and needs persistence:
+      # - ./n8n_template_manager_data/db:/app/n8n_templates.db
+    depends_on:
+      - postgres
+    networks:
+      - n8n-network
+
+volumes:
+  n8n_data:
+  postgres_data:
+  n8n_template_manager_data_whoosh: # Explicit volume name for clarity
+  # n8n_template_manager_data_db: # If SQLite persistence was needed
+
+networks:
+  n8n-network:
+    driver: bridge

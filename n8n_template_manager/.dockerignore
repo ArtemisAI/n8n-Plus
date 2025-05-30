@@ -5,12 +5,15 @@ __pycache__/
 .Python
 env/
 venv/
-# .git/  -- Generally not needed if build context is n8n_template_manager
-# .gitignore -- Generally not needed if build context is n8n_template_manager
-../db_backups/ # Relative to .dockerignore location if context is n8n_template_manager
-../whoosh_index/
-../*.db
-../*.db-journal
+.idea/
+.vscode/
+*.db
+*.db-journal*
+db_backups/
+whoosh_index/
+.env
+.env.*
+*.log
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
